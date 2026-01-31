@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fútbol Tracker Pro</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <!-- Firebase SDKs (Compat for simplicity) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Config -->
+    <script src="config.js"></script>
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="styles.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        heading: ['Poppins', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eaffd0',
+                            100: '#d8ff9b',
+                            500: '#58cc02',
+                            600: '#49b003',
+                            700: '#3f9602',
+                            900: '#2b6a01',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gradient-to-b from-slate-50 to-white text-slate-800 font-sans antialiased selection:bg-brand-500 selection:text-white">
+
+    <!-- Mobile Nav Toggle (Hidden for now, simple implementation) -->
+
+    <!-- Sidebar / Navigation for Desktop & Mobile Header -->
+    <div class="min-h-screen flex flex-col md:flex-row">
+        
+        <!-- Sidebar Navigation -->
+        <aside class="bg-slate-900 text-white w-full md:w-64 flex-shrink-0 md:h-screen md:sticky md:top-0 shadow-2xl z-50">
+            <div class="p-6 flex items-center gap-3 border-b border-slate-800">
+                <div class="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center text-xl shadow-lg shadow-brand-500/30">
+                    <i class="fa-solid fa-futbol text-white"></i>
+                </div>
+                <h1 class="font-heading font-bold text-xl tracking-tight">Fútbol<span class="text-brand-500">Tracker</span></h1>
+            </div>
+            
+            <nav class="p-4 space-y-2">
+                <a href="#dashboard" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl bg-brand-600 text-white shadow-lg shadow-brand-900/20 transition-all">
+                    <i class="fa-solid fa-chart-pie w-5"></i>
+                    <span class="font-medium">Dashboard</span>
+                </a>
+                <a href="#registrar" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
+                    <i class="fa-solid fa-plus-circle w-5"></i>
+                    <span class="font-medium">Registrar Partido</span>
+                </a>
+                <a href="#historial" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
+                    <i class="fa-solid fa-list-ul w-5"></i>
+                    <span class="font-medium">Historial</span>
+                </a>
+                <a href="#torneos" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
+                    <i class="fa-solid fa-trophy w-5"></i>
+                    <span class="font-medium">Torneos</span>
+                </a>
+                <button onclick="document.getElementById('configModal').classList.remove('hidden')" class="w-full nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-all text-left">
+                    <i class="fa-solid fa-cloud w-5"></i>
+                    <span class="font-medium">Sincronización</span>
+                </button>
+                <button onclick="document.getElementById('authModal').classList.remove('hidden')" class="w-full nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-all text-left">
+                    <i class="fa-solid fa-user w-5"></i>
+                    <span class="font-medium">Cuenta</span>
+                </button>
+                <div class="px-4 py-2">
+                    <p class="text-xs text-slate-500 font-mono">ID: <span id="displayUserId">...</span></p>
+                </div>
+            </nav>
+
+            <div class="mt-auto p-6 border-t border-slate-800">
+                <div class="bg-slate-800 rounded-xl p-4">
+                    <p class="text-xs text-slate-400 uppercase font-bold mb-2">Total Gastado</p>
+                    <p id="sidebarTotalSpent" class="text-2xl font-heading font-bold text-white">$0.00</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto h-screen scroll-smooth">
+            
+            <!-- Dashboard View -->
+            <div id="dashboard" class="p-6 md:p-10 max-w-7xl mx-auto space-y-8 section-view">
+                <header class="flex justify-between items-end mb-8">
+                    <div>
+                        <h2 class="text-3xl font-heading font-bold text-slate-900">Resumen General</h2>
+                        <p class="text-slate-500 mt-1">Tus estadísticas y rendimiento en la cancha.</p>
+                    </div>
+                    <div class="hidden md:block">
+                        <button onclick="document.querySelector('a[href=\'#registrar\']').click()" class="bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-lg shadow-lg shadow-brand-500/30 font-medium transition-all flex items-center gap-2">
+                            <i class="fa-solid fa-plus"></i> Nuevo Partido
+                        </button>
+                    </div>
+                </header>
+
+                <!-- Stats Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 hover:shadow-md transition-shadow">
+                        <div class="w-14 h-14 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-2xl">
+                            <i class="fa-solid fa-shirt"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-slate-500 font-medium">Partidos Jugados</p>
+                            <p id="totalMatches" class="text-3xl font-heading font-bold text-slate-800">0</p>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 hover:shadow-md transition-shadow">
+                        <div class="w-14 h-14 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center text-2xl">
+                            <i class="fa-solid fa-futbol"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-slate-500 font-medium">Goles Totales</p>
+                            <p id="totalGoals" class="text-3xl font-heading font-bold text-slate-800">0</p>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 hover:shadow-md transition-shadow">
+                        <div class="w-14 h-14 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center text-2xl">
+                            <i class="fa-solid fa-wallet"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-slate-500 font-medium">Inversión Total</p>
+                            <p id="totalSpent" class="text-3xl font-heading font-bold text-slate-800">$0.00</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Section -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                        <h3 class="font-heading font-bold text-lg text-slate-800 mb-6 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-pie text-slate-400"></i> Rendimiento
+                        </h3>
+                        <div class="h-64 relative">
+                            <canvas id="statsChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                        <h3 class="font-heading font-bold text-lg text-slate-800 mb-6 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line text-slate-400"></i> Evolución de Goles
+                        </h3>
+                        <div class="h-64 relative">
+                            <canvas id="goalsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity Preview -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                        <h3 class="font-heading font-bold text-lg text-slate-800">Últimos Partidos</h3>
+                        <a href="#historial" class="text-sm text-brand-600 font-medium hover:underline">Ver todos</a>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-slate-50 text-slate-500 text-xs uppercase font-semibold">
+                                <tr>
+                                    <th class="px-6 py-4">Fecha</th>
+                                    <th class="px-6 py-4">Lugar</th>
+                                    <th class="px-6 py-4 text-center">Goles</th>
+                                    <th class="px-6 py-4 text-center">Resultado</th>
+                                    <th class="px-6 py-4 text-right">Costo</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentMatchesList" class="divide-y divide-slate-100 text-sm">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Registrar View -->
+            <div id="registrar" class="p-6 md:p-10 max-w-4xl mx-auto space-y-8 section-view hidden">
+                <header>
+                    <h2 class="text-3xl font-heading font-bold text-slate-900">Registrar Partido</h2>
+                    <p class="text-slate-500 mt-1">Añade los detalles de tu último encuentro.</p>
+                </header>
+
+                <div class="bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
+                    <div class="p-8">
+                        <form id="matchForm" class="space-y-8">
+                            <!-- Section 1: Info General -->
+                            <div>
+                                <h4 class="text-sm uppercase tracking-wide text-slate-400 font-bold mb-4">Información del Juego</h4>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div class="space-y-2">
+                                        <label class="text-sm font-medium text-slate-700">Fecha del Partido</label>
+                                        <input type="date" id="date" required class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none transition-all">
+                                    </div>
+                                    <div class="space-y-2">
+                                        <label class="text-sm font-medium text-slate-700">Lugar / Cancha</label>
+                                        <div class="relative">
+                                            <span class="absolute left-4 top-3.5 text-slate-400"><i class="fa-solid fa-location-dot"></i></span>
+                                            <input type="text" id="location" placeholder="Ej: Canchas del Centro" class="w-full bg-slate-50 border border-slate-200 rounded-lg pl-10 pr-4 py-3 focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none transition-all">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr class="border-slate-100">
+
+                            <!-- Section 2: Rendimiento -->
+                            <div>
+                                <h4 class="text-sm uppercase tracking-wide text-slate-400 font-bold mb-4">Tu Rendimiento</h4>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div class="space-y-2">
+                                        <label class="text-sm font-medium text-slate-700">Goles Marcados</label>
+                                        <div class="relative">
+                                            <span class="absolute left-4 top-3.5 text-slate-400"><i class="fa-solid fa-futbol"></i></span>
+                                            <input type="number" id="goals" min="0" value="0" class="w-full bg-slate-50 border border-slate-200 rounded-lg pl-10 pr-4 py-3 focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none transition-all">
+                                        </div>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <label class="text-sm font-medium text-slate-700">Resultado del Partido</label>
+                                        <div class="grid grid-cols-3 gap-3">
+                                            <label class="cursor-pointer">
+                                                <input type="radio" name="result" value="win" class="peer sr-only" checked>
+                                                <div class="text-center py-3 rounded-lg border border-slate-200 peer-checked:bg-green-50 peer-checked:border-green-500 peer-checked:text-green-700 hover:bg-slate-50 transition-all">
+                                                    <div class="text-lg mb-1">🏆</div>
+                                                    <div class="text-xs font-bold">Ganamos</div>
+                                                </div>
+                                            </label>
+                                            <label class="cursor-pointer">
+                                                <input type="radio" name="result" value="draw" class="peer sr-only">
+                                                <div class="text-center py-3 rounded-lg border border-slate-200 peer-checked:bg-amber-50 peer-checked:border-amber-500 peer-checked:text-amber-700 hover:bg-slate-50 transition-all">
+                                                    <div class="text-lg mb-1">🤝</div>
+                                                    <div class="text-xs font-bold">Empate</div>
+                                                </div>
+                                            </label>
+                                            <label class="cursor-pointer">
+                                                <input type="radio" name="result" value="loss" class="peer sr-only">
+                                                <div class="text-center py-3 rounded-lg border border-slate-200 peer-checked:bg-red-50 peer-checked:border-red-500 peer-checked:text-red-700 hover:bg-slate-50 transition-all">
+                                                    <div class="text-lg mb-1">❌</div>
+                                                    <div class="text-xs font-bold">Perdimos</div>
+                                                </div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr class="border-slate-100">
+
+                            <!-- Section 3: Finanzas -->
+                            <div>
+                                <h4 class="text-sm uppercase tracking-wide text-slate-400 font-bold mb-4">Costos</h4>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div class="space-y-2">
+                                        <label class="text-sm font-medium text-slate-700">Costo Total de la Cancha</label>
+                                        <div class="relative">
+                                            <span class="absolute left-4 top-3.5 text-slate-400"><i class="fa-solid fa-dollar-sign"></i></span>
+                                            <input type="number" id="totalCost" min="0" step="0.01" placeholder="0.00" class="w-full bg-slate-50 border border-slate-200 rounded-lg pl-10 pr-4 py-3 focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none transition-all">
+                                        </div>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <label class="text-sm font-medium text-slate-700">Tu Participación (%)</label>
+                                        <div class="flex gap-4">
+                                            <div class="w-24">
+                                                <input type="number" id="percentage" min="0" max="100" value="100" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-3 text-center focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none transition-all">
+                                            </div>
+                                            <div class="flex-1 bg-brand-50 rounded-lg border border-brand-100 flex items-center justify-between px-4">
+                                                <span class="text-sm text-brand-700 font-medium">A pagar:</span>
+                                                <span id="calculatedShare" class="text-lg font-bold text-brand-700">$0.00</span>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-2 mt-2">
+                                            <button type="button" onclick="setPercentage(100)" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">100%</button>
+                                            <button type="button" onclick="setPercentage(50)" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">50%</button>
+                                            <button type="button" onclick="setPercentage(70)" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">70%</button>
+                                            <button type="button" onclick="setPercentage(30)" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">30%</button>
+                                            <button type="button" onclick="setPercentage(20)" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">20%</button>
+                                            <button type="button" onclick="setPercentage(10)" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">10%</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="pt-4">
+                                <div class="mb-6">
+                                    <h4 class="text-sm uppercase tracking-wide text-slate-400 font-bold mb-4">Asignación a Torneo</h4>
+                                    <div class="space-y-2">
+                                        <label class="text-sm font-medium text-slate-700">¿Este partido suma para algún torneo?</label>
+                                        <select id="matchTournament" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-brand-500 outline-none">
+                                            <option value="none">Ninguno</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-brand-500/40 transform hover:-translate-y-0.5 transition-all duration-200">
+                                    <i class="fa-solid fa-save mr-2"></i> Guardar Partido
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Historial View -->
+            <div id="historial" class="p-6 md:p-10 max-w-7xl mx-auto space-y-8 section-view hidden">
+                <header class="flex justify-between items-end">
+                    <div>
+                        <h2 class="text-3xl font-heading font-bold text-slate-900">Historial de Partidos</h2>
+                        <p class="text-slate-500 mt-1">Registro completo de todos tus encuentros.</p>
+                    </div>
+                    <button onclick="if(confirm('¿Borrar todo?')) { localStorage.clear(); location.reload(); }" class="text-red-500 hover:text-red-700 text-sm font-medium">
+                        <i class="fa-solid fa-trash mr-1"></i> Resetear Datos
+                    </button>
+                </header>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-slate-50 text-slate-500 text-xs uppercase font-semibold">
+                                <tr>
+                                    <th class="px-6 py-4">Fecha</th>
+                                    <th class="px-6 py-4">Lugar</th>
+                                    <th class="px-6 py-4 text-center">Goles</th>
+                                    <th class="px-6 py-4 text-center">Resultado</th>
+                                    <th class="px-6 py-4 text-right">Costo</th>
+                                    <th class="px-6 py-4 text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historyList" class="divide-y divide-slate-100 text-sm text-slate-700">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Torneos View -->
+            <div id="torneos" class="p-6 md:p-10 max-w-7xl mx-auto space-y-8 section-view hidden">
+                <header class="flex flex-col md:flex-row md:justify-between md:items-end gap-4">
+                    <div>
+                        <h2 class="text-3xl font-heading font-bold text-slate-900">Torneos y Ligas</h2>
+                        <p class="text-slate-500 mt-1">Gestiona tus competiciones con amigos.</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="document.getElementById('joinTournamentModal').classList.remove('hidden')" class="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-5 py-2.5 rounded-lg shadow-sm font-medium transition-all flex items-center gap-2">
+                            <i class="fa-solid fa-link"></i> Unirse
+                        </button>
+                        <button onclick="document.getElementById('createTournamentModal').classList.remove('hidden')" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg shadow-lg shadow-blue-500/30 font-medium transition-all flex items-center gap-2">
+                            <i class="fa-solid fa-trophy"></i> Crear Torneo
+                        </button>
+                    </div>
+                </header>
+
+                <!-- Tournament List -->
+                <div id="tournamentsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Cards populated by JS -->
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Modal Crear Torneo -->
+    <div id="createTournamentModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100">
+            <div class="bg-blue-600 p-6 text-white flex justify-between items-center">
+                <h3 class="text-xl font-bold font-heading"><i class="fa-solid fa-trophy mr-2"></i> Nuevo Torneo</h3>
+                <button onclick="document.getElementById('createTournamentModal').classList.add('hidden')" class="text-white/80 hover:text-white">
+                    <i class="fa-solid fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-6">
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-slate-700">Nombre del Torneo</label>
+                    <input type="text" id="tournamentName" placeholder="Ej: Copa Verano 2026" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-slate-700">Participantes</label>
+                    <textarea id="tournamentFriends" placeholder="Nombres separados por coma (Ej: Juan, Pedro, Luis...)" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none h-32 resize-none"></textarea>
+                </div>
+                
+                <div class="flex items-center gap-3 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                    <input type="checkbox" id="isOnlineTournament" class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500">
+                    <div>
+                        <p class="font-medium text-blue-900">Torneo Online</p>
+                        <p class="text-xs text-blue-700">Permite compartir con amigos via código</p>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-slate-700">Premio para el más ganador (opcional)</label>
+                    <input type="number" id="tournamentPrizePool" min="0" step="0.01" placeholder="Ej: 100.00" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none">
+                    <p class="text-xs text-slate-500">Se otorga al jugador con más victorias.</p>
+                </div>
+
+                <button id="createTournamentBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-all">
+                    Crear Torneo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Unirse a Torneo -->
+    <div id="joinTournamentModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100">
+            <div class="bg-slate-800 p-6 text-white flex justify-between items-center">
+                <h3 class="text-xl font-bold font-heading"><i class="fa-solid fa-link mr-2"></i> Unirse a Torneo</h3>
+                <button onclick="document.getElementById('joinTournamentModal').classList.add('hidden')" class="text-white/80 hover:text-white">
+                    <i class="fa-solid fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-6">
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-slate-700">Código del Torneo</label>
+                    <input type="text" id="joinTournamentCode" placeholder="Ej: A1B2C3" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-slate-500 outline-none uppercase tracking-widest text-center font-mono text-xl">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-slate-700">Tu Nombre</label>
+                    <input type="text" id="joinTournamentName" placeholder="Ej: Ignacio" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-slate-500 outline-none">
+                    <p class="text-xs text-slate-400">Se añadirá a la lista de participantes y quedará sincronizado.</p>
+                </div>
+                <button id="joinTournamentBtn" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl transition-all">
+                    Buscar y Unirse
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Configuración Firebase -->
+    <div id="configModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all scale-100">
+            <div class="bg-emerald-600 p-6 text-white flex justify-between items-center">
+                <h3 class="text-xl font-bold font-heading"><i class="fa-solid fa-cloud mr-2"></i> Configuración Online</h3>
+                <button onclick="document.getElementById('configModal').classList.add('hidden')" class="text-white/80 hover:text-white">
+                    <i class="fa-solid fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <p class="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    Para compartir datos entre dispositivos, necesitas configurar un proyecto gratuito de Firebase.
+                    <br><a href="https://console.firebase.google.com/" target="_blank" class="text-blue-600 underline">Crea uno aquí</a> y pega tu configuración abajo.
+                </p>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-slate-700">Firebase Config (JSON)</label>
+                    <textarea id="firebaseConfigInput" placeholder='{"apiKey": "...", "authDomain": "...", "projectId": "..."}' class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none h-40 font-mono text-xs"></textarea>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="saveFirebaseConfig()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all">
+                        Guardar Conexión
+                    </button>
+                    <button onclick="localStorage.removeItem('firebaseConfig'); location.reload();" class="px-4 py-3 text-red-500 hover:bg-red-50 rounded-xl font-medium transition-all">
+                        Desconectar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Cuenta -->
+    <div id="authModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100">
+            <div class="bg-slate-900 p-6 text-white flex justify-between items-center">
+                <h3 class="text-xl font-bold font-heading"><i class="fa-solid fa-user mr-2"></i> Cuenta</h3>
+                <button onclick="document.getElementById('authModal').classList.add('hidden')" class="text-white/80 hover:text-white">
+                    <i class="fa-solid fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-slate-700">Nombre</label>
+                    <input type="text" id="authName" placeholder="Tu nombre" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-slate-500 outline-none">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-slate-700">Email</label>
+                    <input type="email" id="authEmail" placeholder="email@ejemplo.com" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-slate-500 outline-none">
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-slate-700">Contraseña</label>
+                    <input type="password" id="authPassword" placeholder="••••••••" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-slate-500 outline-none">
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button id="btnLogin" class="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl transition-all">Iniciar Sesión</button>
+                    <button id="btnRegister" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-xl transition-all">Crear Cuenta</button>
+                </div>
+                <div class="pt-2">
+                    <button id="btnLogout" class="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-3 rounded-xl transition-all">Cerrar Sesión</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Tabla de Posiciones -->
+    <div id="tournamentTableModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden transform transition-all scale-100">
+            <div class="bg-emerald-600 p-6 text-white flex justify-between items-center">
+                <h3 class="text-xl font-bold font-heading"><i class="fa-solid fa-ranking-star mr-2"></i> <span id="tournamentTableTitle">Tabla de Posiciones</span></h3>
+                <button onclick="document.getElementById('tournamentTableModal').classList.add('hidden')" class="text-white/80 hover:text-white">
+                    <i class="fa-solid fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div id="tournamentTableStatus" class="text-sm text-slate-500"></div>
+                <div class="flex items-center justify-between gap-4">
+                    <div id="tournamentPrizeInfo" class="text-sm text-emerald-700 font-medium"></div>
+                    <div class="flex items-center gap-2">
+                        <label for="tournamentSortSelect" class="text-sm text-slate-600">Ordenar por</label>
+                        <select id="tournamentSortSelect" class="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                            <option value="points">Puntos</option>
+                            <option value="wins">Victorias</option>
+                            <option value="goals">Goles</option>
+                            <option value="spent">Gasto</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl border border-slate-200 overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-slate-50 text-slate-500 text-xs uppercase font-semibold">
+                            <tr>
+                                <th class="px-6 py-3">Jugador</th>
+                                <th class="px-6 py-3 text-center">PJ</th>
+                                <th class="px-6 py-3 text-center">W</th>
+                                <th class="px-6 py-3 text-center">D</th>
+                                <th class="px-6 py-3 text-center">L</th>
+                                <th class="px-6 py-3 text-center">Goles</th>
+                                <th class="px-6 py-3 text-right">Gasto</th>
+                                <th class="px-6 py-3 text-center">Puntos</th>
+                                <th class="px-6 py-3 text-center">Últimos 5</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tournamentTableBody" class="divide-y divide-slate-100 text-sm text-slate-700">
+                            <!-- Rellenado por JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Editar Partido -->
+    <div id="editMatchModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all scale-100">
+            <div class="bg-slate-900 p-6 text-white flex justify-between items-center">
+                <h3 class="text-xl font-bold font-heading"><i class="fa-solid fa-pen mr-2"></i> Editar Partido</h3>
+                <button onclick="document.getElementById('editMatchModal').classList.add('hidden')" class="text-white/80 hover:text-white">
+                    <i class="fa-solid fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-6">
+                <input type="hidden" id="editMatchId">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-slate-700">Fecha</label>
+                        <input type="date" id="editDate" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-slate-700">Lugar</label>
+                        <input type="text" id="editLocation" placeholder="Cancha / Barrio" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-slate-700">Goles</label>
+                        <input type="number" id="editGoals" min="0" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-slate-700">Resultado</label>
+                        <select id="editResult" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-brand-500 outline-none">
+                            <option value="win">Victoria</option>
+                            <option value="draw">Empate</option>
+                            <option value="loss">Derrota</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-slate-700">Costo Total</label>
+                        <input type="number" id="editTotalCost" min="0" step="0.01" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-slate-700">Participación (%)</label>
+                        <div class="flex gap-3">
+                            <input type="number" id="editPercentage" min="0" max="100" class="w-24 bg-slate-50 border border-slate-200 rounded-lg px-3 py-3 text-center focus:ring-2 focus:ring-brand-500 outline-none">
+                            <div class="flex-1 bg-brand-50 rounded-lg border border-brand-100 flex items-center justify-between px-4">
+                                <span class="text-sm text-brand-700 font-medium">A pagar:</span>
+                                <span id="editCalculatedShare" class="text-lg font-bold text-brand-700">$0.00</span>
+                            </div>
+                        </div>
+                        <div class="flex gap-2 mt-2">
+                            <button type="button" onclick="setEditPercentage(100)" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">100%</button>
+                            <button type="button" onclick="setEditPercentage(70)" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">70%</button>
+                            <button type="button" onclick="setEditPercentage(50)" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">50%</button>
+                            <button type="button" onclick="setEditPercentage(30)" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-full transition-colors">30%</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-sm font-medium text-slate-700">Torneo</label>
+                    <select id="editMatchTournament" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-brand-500 outline-none">
+                        <option value="none">Ninguno</option>
+                    </select>
+                </div>
+                <button id="saveEditMatchBtn" onclick="saveEditedMatch()" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-xl transition-all">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
