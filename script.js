@@ -1,16 +1,6 @@
 // State Management
 let matches = JSON.parse(localStorage.getItem('matches')) || [];
 let tournaments = JSON.parse(localStorage.getItem('tournaments')) || [];
-let db = null;
-let userId = localStorage.getItem('userId');
-let playerName = localStorage.getItem('playerName') || '';
-if (!userId) {
-    userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-    localStorage.setItem('userId', userId);
-}
-document.getElementById('displayUserId').textContent = userId;
-
-let firebaseConfig = null;
 
 // DOM Elements
 const matchForm = document.getElementById('matchForm');
@@ -30,135 +20,6 @@ const totalCostEl = document.getElementById('totalCost');
 const percentageEl = document.getElementById('percentage');
 const calculatedShareEl = document.getElementById('calculatedShare');
 
-// Online Elements
-const joinTournamentBtn = document.getElementById('joinTournamentBtn');
-const joinTournamentCodeInput = document.getElementById('joinTournamentCode');
-const joinTournamentNameInput = document.getElementById('joinTournamentName');
-const isOnlineTournamentCheckbox = document.getElementById('isOnlineTournament');
-
-// Initialize Firebase if config exists
-function initFirebase() {
-    // Prioritize global config from config.js
-    if (window.APP_CONFIG && window.APP_CONFIG.firebaseConfig) {
-        firebaseConfig = window.APP_CONFIG.firebaseConfig;
-    } else {
-        firebaseConfig = JSON.parse(localStorage.getItem('firebaseConfig')) || null;
-    }
-
-    if (firebaseConfig && firebase.apps.length === 0) {
-        try {
-            firebase.initializeApp(firebaseConfig);
-            db = firebase.firestore();
-            if (firebase.analytics) {
-                firebase.analytics();
-            }
-            const auth = firebase.auth();
-            const handleReady = (u) => {
-                if (u) {
-                    userId = u.uid;
-                    localStorage.setItem('userId', userId);
-                    const el = document.getElementById('displayUserId');
-                    if (el) el.textContent = userId;
-                    // Sync local player name with auth profile
-                    const displayName = u.displayName || '';
-                    if (displayName) {
-                        playerName = displayName;
-                        localStorage.setItem('playerName', playerName);
-                    }
-                    syncMatches();
-                    tournaments.forEach(t => {
-                        if (t.isOnline && t.code) {
-                            subscribeToTournament(t.code);
-                        }
-                    });
-                }
-            };
-            auth.onAuthStateChanged(handleReady);
-            // No autenticación anónima automática
-        } catch (e) {
-            console.error("Firebase init error:", e);
-            Swal.fire('Error', 'Error al conectar con Firebase. Revisa tu configuración.', 'error');
-        }
-    }
-}
-
-function syncMatches() {
-    if (!db || !userId) return;
-    
-    // Listen for my matches
-    db.collection('matches').where('userId', '==', userId).onSnapshot((snapshot) => {
-        let needsUpdate = false;
-        snapshot.docChanges().forEach((change) => {
-            const data = change.doc.data();
-            if (change.type === "added" || change.type === "modified") {
-                // Check if we already have it locally with same data
-                const index = matches.findIndex(m => m.id === data.id);
-                if (index === -1) {
-                    matches.push(data);
-                    needsUpdate = true;
-                } else if (JSON.stringify(matches[index]) !== JSON.stringify(data)) {
-                    matches[index] = data;
-                    needsUpdate = true;
-                }
-            }
-            if (change.type === "removed") {
-                matches = matches.filter(m => m.id !== data.id);
-                needsUpdate = true;
-            }
-        });
-        
-        if (needsUpdate) {
-            matches.sort((a, b) => new Date(b.date) - new Date(a.date)); // Keep sorted
-            localStorage.setItem('matches', JSON.stringify(matches));
-            updateUI();
-        }
-    });
-}
-
-function saveMatchToCloud(match) {
-    if (!db || !userId) return;
-    // Add userId to match data
-    const matchData = { ...match, userId: userId, playerName: playerName || null };
-    db.collection('matches').doc(String(match.id)).set(matchData)
-        .catch(err => console.error("Error saving match to cloud:", err));
-}
-
-function deleteMatchFromCloud(id) {
-    if (!db) return;
-    db.collection('matches').doc(String(id)).delete()
-        .catch(err => console.error("Error deleting match from cloud:", err));
-}
-
-function subscribeToTournament(code) {
-    if (!db) return;
-    db.collection('tournaments').doc(code).onSnapshot((doc) => {
-        if (doc.exists) {
-            const remoteData = doc.data();
-            const index = tournaments.findIndex(t => t.code === code);
-            if (index !== -1) {
-                tournaments[index] = { ...tournaments[index], ...remoteData };
-                localStorage.setItem('tournaments', JSON.stringify(tournaments));
-                renderTournaments();
-                populateTournamentSelect();
-            }
-        }
-    });
-}
-
-window.saveFirebaseConfig = function() {
-    const input = document.getElementById('firebaseConfigInput').value;
-    try {
-        const config = JSON.parse(input);
-        localStorage.setItem('firebaseConfig', JSON.stringify(config));
-        firebaseConfig = config;
-        Swal.fire('¡Éxito!', 'Configuración guardada. Reiniciando...', 'success').then(() => {
-            location.reload();
-        });
-    } catch (e) {
-        Swal.fire('Error', 'Formato JSON inválido', 'error');
-    }
-};
-
 // Chart Instances
 let myChart = null;
 let goalsChart = null;
@@ -169,10 +30,10 @@ function populateTournamentSelect() {
     const current = select.value;
     select.innerHTML = '<option value="none">Ninguno</option>';
     tournaments.forEach(t => {
-        const value = t.code ? t.code : ('local-' + t.id);
+        const value = 'local-' + t.id;
         const opt = document.createElement('option');
         opt.value = value;
-        opt.textContent = t.name + (t.isOnline ? ' (Online)' : '');
+        opt.textContent = t.name;
         select.appendChild(opt);
     });
     if (current) {
@@ -223,8 +84,6 @@ async function openTournamentTable(value) {
     if (value && value.startsWith('local-')) {
         const localId = parseInt(value.replace('local-', ''), 10);
         tournament = tournaments.find(t => t.id === localId);
-    } else {
-        tournament = tournaments.find(t => t.code === value);
     }
     const name = tournament ? tournament.name : 'Torneo';
     titleEl.textContent = `Tabla de Posiciones — ${name}`;
@@ -239,11 +98,6 @@ async function openTournamentTable(value) {
         let sourceMatches = [];
         if (value && value.startsWith('local-')) {
             sourceMatches = matches.filter(m => m.tournamentLocalId && ('local-' + m.tournamentLocalId) === value);
-        } else if (db) {
-            const snap = await db.collection('matches').where('tournamentCode', '==', value).get();
-            sourceMatches = snap.docs.map(d => d.data());
-        } else {
-            sourceMatches = matches.filter(m => m.tournamentCode === value);
         }
         let standings = computeStandings(sourceMatches);
         if (standings.length === 0) {
@@ -290,113 +144,13 @@ async function openTournamentTable(value) {
     }
 }
 // Initialize
-function setupAuthHandlers() {
-    const modal = document.getElementById('authModal');
-    const emailEl = document.getElementById('authEmail');
-    const passEl = document.getElementById('authPassword');
-    const nameEl = document.getElementById('authName');
-    const btnLogin = document.getElementById('btnLogin');
-    const btnRegister = document.getElementById('btnRegister');
-    const btnLogout = document.getElementById('btnLogout');
-    const auth = firebase.auth();
-    if (!auth) return;
-    try {
-        if (auth.setPersistence) {
-            auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-        }
-    } catch {}
-    if (btnRegister) {
-        btnRegister.addEventListener('click', async () => {
-            const email = emailEl.value.trim();
-            const pass = passEl.value.trim();
-            const name = nameEl.value.trim();
-            if (!email || !pass) {
-                Swal.fire('Error', 'Email y contraseña son obligatorios.', 'error');
-                return;
-            }
-            try {
-                if (auth.setPersistence) {
-                    await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-                }
-                await auth.createUserWithEmailAndPassword(email, pass);
-                if (auth.currentUser && name) {
-                    await auth.currentUser.updateProfile({ displayName: name });
-                }
-                try {
-                    await firebase.firestore().collection('users').doc(auth.currentUser.uid).set({
-                        email,
-                        displayName: name || null,
-                        createdAt: new Date().toISOString()
-                    }, { merge: true });
-                } catch {}
-                playerName = name || playerName || '';
-                localStorage.setItem('playerName', playerName);
-                if (modal) modal.classList.add('hidden');
-                Swal.fire('Listo', 'Cuenta creada e iniciada.', 'success');
-            } catch (e) {
-                let msg = 'No se pudo crear la cuenta.';
-                if (e.code === 'auth/email-already-in-use') msg = 'Ese email ya está en uso.';
-                else if (e.code === 'auth/invalid-email') msg = 'Email inválido.';
-                else if (e.code === 'auth/weak-password') msg = 'Contraseña muy débil (mínimo 6 caracteres).';
-                else if (e.code === 'auth/operation-not-allowed') msg = 'Método Email/Password deshabilitado en Firebase.';
-                Swal.fire('Error', msg, 'error');
-            }
-        });
-    }
-    if (btnLogin) {
-        btnLogin.addEventListener('click', async () => {
-            const email = emailEl.value.trim();
-            const pass = passEl.value.trim();
-            const name = nameEl.value.trim();
-            if (!email || !pass) {
-                Swal.fire('Error', 'Email y contraseña son obligatorios.', 'error');
-                return;
-            }
-            try {
-                if (auth.setPersistence) {
-                    await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-                }
-                await auth.signInWithEmailAndPassword(email, pass);
-                if (auth.currentUser && name) {
-                    await auth.currentUser.updateProfile({ displayName: name });
-                }
-                playerName = name || (auth.currentUser && auth.currentUser.displayName) || playerName || '';
-                localStorage.setItem('playerName', playerName);
-                if (modal) modal.classList.add('hidden');
-                Swal.fire('Bienvenido', 'Sesión iniciada.', 'success');
-            } catch (e) {
-                let msg = 'No se pudo iniciar sesión.';
-                if (e.code === 'auth/user-not-found') msg = 'Usuario no encontrado.';
-                else if (e.code === 'auth/wrong-password') msg = 'Contraseña incorrecta.';
-                else if (e.code === 'auth/invalid-email') msg = 'Email inválido.';
-                Swal.fire('Error', msg, 'error');
-            }
-        });
-    }
-    if (btnLogout) {
-        btnLogout.addEventListener('click', async () => {
-            try {
-                await auth.signOut();
-                Swal.fire('Sesión cerrada', 'Has cerrado sesión.', 'success');
-            } catch {
-                Swal.fire('Error', 'No se pudo cerrar sesión.', 'error');
-            }
-        });
-    }
-}
-// Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    initFirebase();
-    if (firebaseConfig) {
-        document.getElementById('firebaseConfigInput').value = JSON.stringify(firebaseConfig, null, 2);
-    }
-    setupAuthHandlers();
     const t = localStorage.getItem('theme');
     if (t) {
         document.body.classList.add(`theme-${t}`);
     }
     // Navigation Handling
-    const links = document.querySelectorAll('nav a, nav button'); // Include the sync button
+    const links = document.querySelectorAll('nav a'); 
     const sections = document.querySelectorAll('.section-view');
 
     function switchView(targetId) {
@@ -471,22 +225,14 @@ if(matchForm) {
         const cost = calculateShare(); // Get the calculated value
         const tournamentSelect = document.getElementById('matchTournament');
         const tournamentValue = tournamentSelect ? tournamentSelect.value : 'none';
-        let tournamentCode = null;
         let tournamentLocalId = null;
         let tournamentName = null;
         if (tournamentValue && tournamentValue !== 'none') {
-            const t = tournaments.find(tt => (tt.code && tt.code === tournamentValue) || ('local-' + tt.id) === tournamentValue);
+            const t = tournaments.find(tt => ('local-' + tt.id) === tournamentValue);
             if (t) {
                 tournamentName = t.name;
-                if (t.code) tournamentCode = t.code;
-                else tournamentLocalId = t.id;
+                tournamentLocalId = t.id;
             }
-        }
-        // Ensure player name is set from auth profile if available
-        const auth = firebase.auth();
-        if ((!playerName || playerName.trim() === '') && auth && auth.currentUser && auth.currentUser.displayName) {
-            playerName = auth.currentUser.displayName;
-            localStorage.setItem('playerName', playerName);
         }
 
         const newMatch = {
@@ -498,15 +244,12 @@ if(matchForm) {
             totalCost,
             percentage,
             cost,
-            tournamentCode,
             tournamentLocalId,
-            tournamentName,
-            playerName: playerName || null
+            tournamentName
         };
 
         matches.unshift(newMatch); // Add to beginning
         saveMatches();
-        saveMatchToCloud(newMatch); // Save to cloud
         updateUI();
         matchForm.reset();
         
@@ -775,23 +518,8 @@ function renderTournaments() {
             ? t.friends.map(f => `<span class="inline-block bg-slate-100 text-slate-600 text-xs font-semibold px-2.5 py-1 rounded-full mr-1 mb-1">${f}</span>`).join('') 
             : '<span class="text-slate-400 text-sm italic">Sin participantes</span>';
 
-        // Online Badge and Code
-        let onlineBadge = '';
-        let codeSection = '';
         let prizeSection = '';
         
-        if (t.isOnline) {
-            onlineBadge = `<span class="absolute top-4 right-12 bg-emerald-100 text-emerald-700 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full"><i class="fa-solid fa-cloud mr-1"></i>Online</span>`;
-            codeSection = `
-                <div class="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between group/code cursor-pointer" onclick="copyToClipboard('${t.code}')">
-                    <div>
-                        <p class="text-[10px] text-slate-400 uppercase font-bold">Código de Invitación</p>
-                        <p class="text-sm font-mono font-bold text-slate-700 tracking-wider">${t.code}</p>
-                    </div>
-                    <i class="fa-regular fa-copy text-slate-400 group-hover/code:text-blue-500 transition-colors"></i>
-                </div>
-            `;
-        }
         if (t.prizePool && Number(t.prizePool) > 0) {
             prizeSection = `
                 <div class="mt-3">
@@ -806,9 +534,8 @@ function renderTournaments() {
             <div class="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                  <button onclick="deleteTournament(${t.id})" class="text-slate-400 hover:text-red-500 transition-colors"><i class="fa-solid fa-trash"></i></button>
             </div>
-            ${onlineBadge}
             <div class="flex items-center gap-3 mb-4 mt-2">
-                <div class="w-10 h-10 rounded-lg ${t.isOnline ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'} flex items-center justify-center">
+                <div class="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
                     <i class="fa-solid fa-trophy"></i>
                 </div>
                 <div>
@@ -824,10 +551,9 @@ function renderTournaments() {
                 </div>
             </div>
 
-            ${codeSection}
             ${prizeSection}
             
-            <button onclick="openTournamentTable('${t.code ? t.code : 'local-'+t.id}')" class="w-full mt-4 py-2 text-sm font-medium ${t.isOnline ? 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'} rounded-lg transition-colors">
+            <button onclick="openTournamentTable('local-${t.id}')" class="w-full mt-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
                 Ver Tabla de Posiciones
             </button>
         `;
@@ -849,7 +575,6 @@ window.deleteMatch = function(id) {
         if (result.isConfirmed) {
             matches = matches.filter(m => m.id !== id);
             saveMatches();
-            deleteMatchFromCloud(id);
             updateUI();
             Swal.fire('Eliminado', 'El partido ha sido eliminado.', 'success');
         }
@@ -872,14 +597,13 @@ window.openEditMatch = function(id) {
     if (select) {
         select.innerHTML = '<option value="none">Ninguno</option>';
         tournaments.forEach(t => {
-            const value = t.code ? t.code : ('local-' + t.id);
+            const value = 'local-' + t.id;
             const opt = document.createElement('option');
             opt.value = value;
-            opt.textContent = t.name + (t.isOnline ? ' (Online)' : '');
+            opt.textContent = t.name;
             select.appendChild(opt);
         });
-        if (m.tournamentCode) select.value = m.tournamentCode;
-        else if (m.tournamentLocalId) select.value = 'local-' + m.tournamentLocalId;
+        if (m.tournamentLocalId) select.value = 'local-' + m.tournamentLocalId;
         else select.value = 'none';
     }
     calculateEditShare();
@@ -914,23 +638,21 @@ window.saveEditedMatch = function() {
     const percentage = parseFloat(document.getElementById('editPercentage').value) || 0;
     const cost = (totalCost * percentage) / 100;
     const tournamentValue = document.getElementById('editMatchTournament').value;
-    let tournamentCode = null, tournamentLocalId = null, tournamentName = null;
+    let tournamentLocalId = null, tournamentName = null;
     if (tournamentValue && tournamentValue !== 'none') {
-        const t = tournaments.find(tt => (tt.code && tt.code === tournamentValue) || ('local-' + tt.id) === tournamentValue);
+        const t = tournaments.find(tt => ('local-' + tt.id) === tournamentValue);
         if (t) {
             tournamentName = t.name;
-            if (t.code) tournamentCode = t.code;
-            else tournamentLocalId = t.id;
+            tournamentLocalId = t.id;
         }
     }
     matches[idx] = {
         ...matches[idx],
         date, location, goals, result,
         totalCost, percentage, cost,
-        tournamentCode, tournamentLocalId, tournamentName
+        tournamentLocalId, tournamentName
     };
     saveMatches();
-    saveMatchToCloud(matches[idx]);
     updateUI();
     document.getElementById('editMatchModal').classList.add('hidden');
     Swal.fire('Actualizado', 'El partido fue editado correctamente.', 'success');
@@ -977,9 +699,6 @@ function setupTournamentHandlers() {
         newBtn.addEventListener('click', async () => {
             const name = document.getElementById('tournamentName').value;
             const friendsStr = document.getElementById('tournamentFriends').value;
-            // Re-fetch element to be safe
-            const isOnlineCheckbox = document.getElementById('isOnlineTournament');
-            const isOnline = isOnlineCheckbox ? isOnlineCheckbox.checked : false;
             const prizeEl = document.getElementById('tournamentPrizePool');
             const prizePool = prizeEl ? parseFloat(prizeEl.value) || 0 : 0;
 
@@ -995,167 +714,22 @@ function setupTournamentHandlers() {
                 name,
                 friends,
                 dateCreated: new Date().toLocaleDateString(),
-                isOnline: isOnline,
-                code: isOnline ? Math.random().toString(36).substring(2, 8).toUpperCase() : null,
                 prizePool: prizePool > 0 ? prizePool : null,
                 prizeCriteria: 'wins'
             };
 
-            if (isOnline) {
-                if (!db) {
-                    Swal.fire('Configuración Requerida', 'Para crear un torneo online necesitas configurar Firebase primero en la sección de Sincronización.', 'warning');
-                    return;
-                }
-                const auth = firebase.auth();
-                if (!auth.currentUser) {
-                    document.getElementById('authModal').classList.remove('hidden');
-                    Swal.fire('Inicio requerido', 'Inicia sesión para crear torneos online.', 'info');
-                    return;
-                }
-                try {
-                    newBtn.disabled = true;
-                    newBtn.textContent = 'Creando...';
-                    
-                    // Timeout promise (10 seconds)
-                    const timeout = new Promise((_, reject) => {
-                        setTimeout(() => reject(new Error('timeout')), 10000);
-                    });
-
-                    // Race between creation and timeout
-                    await Promise.race([
-                        db.collection('tournaments').doc(newTournament.code).set(newTournament),
-                        timeout
-                    ]);
-                    
-                    // Subscribe immediately
-                    subscribeToTournament(newTournament.code);
-                } catch (e) {
-                    console.error("Error creating tournament:", e);
-                    let errorMsg = 'No se pudo crear el torneo en la nube.';
-                    
-                    if (e.message === 'timeout') {
-                        errorMsg = 'La conexión está tardando demasiado. Verifica tu internet o si la base de datos Firestore está habilitada en la consola de Firebase.';
-                    } else if (e.code === 'permission-denied') {
-                        errorMsg = 'Permiso denegado. Verifica las reglas de seguridad de Firestore en la consola de Firebase.';
-                    } else if (e.code === 'unavailable') {
-                        errorMsg = 'Servicio no disponible o sin conexión.';
-                    }
-
-                    Swal.fire('Error', errorMsg, 'error');
-                    newBtn.disabled = false;
-                    newBtn.textContent = 'Crear Torneo';
-                    return;
-                }
-            }
-
             tournaments.push(newTournament);
             saveTournaments();
             renderTournaments();
+            populateTournamentSelect();
             
+            // Close modal
             document.getElementById('createTournamentModal').classList.add('hidden');
             document.getElementById('tournamentName').value = '';
             document.getElementById('tournamentFriends').value = '';
-            newBtn.disabled = false;
-            newBtn.textContent = 'Crear Torneo';
+            if (prizeEl) prizeEl.value = '';
             
-            if (isOnline) {
-                 Swal.fire({
-                    title: '¡Torneo Online Creado!',
-                    html: `Comparte este código con tus amigos:<br><strong class="text-2xl">${newTournament.code}</strong>`,
-                    icon: 'success'
-                });
-            }
-        });
-    }
-
-    if (joinTournamentBtn) {
-        // Remove existing listeners
-        const oldJoinBtn = document.getElementById('joinTournamentBtn');
-        const newJoinBtn = oldJoinBtn.cloneNode(true);
-        oldJoinBtn.parentNode.replaceChild(newJoinBtn, oldJoinBtn);
-
-        newJoinBtn.addEventListener('click', async () => {
-            const joinInput = document.getElementById('joinTournamentCode');
-            const code = joinInput ? joinInput.value.trim().toUpperCase() : '';
-            const nameInput = document.getElementById('joinTournamentName');
-            const name = nameInput ? nameInput.value.trim() : '';
-            
-            if (!code) {
-                Swal.fire('Error', 'Ingresa el código del torneo.', 'error');
-                return;
-            }
-            if (!name) {
-                Swal.fire('Error', 'Ingresa tu nombre para unirte.', 'error');
-                return;
-            }
-
-            if (!db) {
-                Swal.fire('Configuración Requerida', 'Necesitas configurar Firebase para unirte a torneos online.', 'warning');
-                return;
-            }
-            const auth = firebase.auth();
-            if (!auth.currentUser) {
-                document.getElementById('authModal').classList.remove('hidden');
-                Swal.fire('Inicio requerido', 'Inicia sesión para unirte a torneos online.', 'info');
-                return;
-            }
-
-            // Check if already joined
-            if (tournaments.some(t => t.code === code)) {
-                Swal.fire('Info', 'Ya estás unido a este torneo.', 'info');
-                return;
-            }
-
-            try {
-                newJoinBtn.disabled = true;
-                newJoinBtn.textContent = 'Buscando...';
-                
-                const doc = await db.collection('tournaments').doc(code).get();
-                
-                if (doc.exists) {
-                    const tournamentData = doc.data();
-                    // Persist player name locally
-                    playerName = name;
-                    localStorage.setItem('playerName', playerName);
-
-                    // Add to remote participants list using arrayUnion
-                    try {
-                        await db.collection('tournaments').doc(code).update({
-                            friends: firebase.firestore.FieldValue.arrayUnion(playerName)
-                        });
-                        // Also reflect locally if not present
-                        if (Array.isArray(tournamentData.friends) && !tournamentData.friends.includes(playerName)) {
-                            tournamentData.friends.push(playerName);
-                        }
-                    } catch (e) {
-                        // If update fails due to missing field, set it
-                        if (e.code === 'not-found') {
-                            await db.collection('tournaments').doc(code).set({
-                                ...tournamentData,
-                                friends: Array.isArray(tournamentData.friends) ? tournamentData.friends : [],
-                            }, { merge: true });
-                        }
-                    }
-
-                    tournaments.push(tournamentData);
-                    saveTournaments();
-                    subscribeToTournament(code);
-                    renderTournaments();
-                    
-                    document.getElementById('joinTournamentModal').classList.add('hidden');
-                    if(joinInput) joinInput.value = '';
-                    if(nameInput) nameInput.value = '';
-                    Swal.fire('¡Unido!', `Te has unido a "${tournamentData.name}"`, 'success');
-                } else {
-                    Swal.fire('Error', 'No se encontró ningún torneo con ese código.', 'error');
-                }
-            } catch (e) {
-                console.error(e);
-                Swal.fire('Error', 'Error de conexión.', 'error');
-            } finally {
-                newJoinBtn.disabled = false;
-                newJoinBtn.textContent = 'Buscar y Unirse';
-            }
+            Swal.fire('¡Éxito!', 'Torneo creado localmente.', 'success');
         });
     }
 }

@@ -12,15 +12,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Chart.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
-    <!-- Firebase SDKs (Compat for simplicity) -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <!-- Config -->
-    <script src="config.js"></script>
     <!-- Custom Styles -->
     <link rel="stylesheet" href="styles.css">
     <script>
@@ -79,17 +72,6 @@
                     <i class="fa-solid fa-trophy w-5"></i>
                     <span class="font-medium">Torneos</span>
                 </a>
-                <button onclick="document.getElementById('configModal').classList.remove('hidden')" class="w-full nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-all text-left">
-                    <i class="fa-solid fa-cloud w-5"></i>
-                    <span class="font-medium">Sincronización</span>
-                </button>
-                <button onclick="document.getElementById('authModal').classList.remove('hidden')" class="w-full nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-all text-left">
-                    <i class="fa-solid fa-user w-5"></i>
-                    <span class="font-medium">Cuenta</span>
-                </button>
-                <div class="px-4 py-2">
-                    <p class="text-xs text-slate-500 font-mono">ID: <span id="displayUserId">...</span></p>
-                </div>
             </nav>
 
             <div class="mt-auto p-6 border-t border-slate-800">
@@ -359,9 +341,6 @@
                         <p class="text-slate-500 mt-1">Gestiona tus competiciones con amigos.</p>
                     </div>
                     <div class="flex gap-2">
-                        <button onclick="document.getElementById('joinTournamentModal').classList.remove('hidden')" class="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 px-5 py-2.5 rounded-lg shadow-sm font-medium transition-all flex items-center gap-2">
-                            <i class="fa-solid fa-link"></i> Unirse
-                        </button>
                         <button onclick="document.getElementById('createTournamentModal').classList.remove('hidden')" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg shadow-lg shadow-blue-500/30 font-medium transition-all flex items-center gap-2">
                             <i class="fa-solid fa-trophy"></i> Crear Torneo
                         </button>
@@ -396,13 +375,6 @@
                     <textarea id="tournamentFriends" placeholder="Nombres separados por coma (Ej: Juan, Pedro, Luis...)" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none h-32 resize-none"></textarea>
                 </div>
                 
-                <div class="flex items-center gap-3 p-4 bg-blue-50 rounded-lg border border-blue-100">
-                    <input type="checkbox" id="isOnlineTournament" class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500">
-                    <div>
-                        <p class="font-medium text-blue-900">Torneo Online</p>
-                        <p class="text-xs text-blue-700">Permite compartir con amigos via código</p>
-                    </div>
-                </div>
                 <div class="space-y-2">
                     <label class="text-sm font-medium text-slate-700">Premio para el más ganador (opcional)</label>
                     <input type="number" id="tournamentPrizePool" min="0" step="0.01" placeholder="Ej: 100.00" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none">
@@ -412,95 +384,6 @@
                 <button id="createTournamentBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-all">
                     Crear Torneo
                 </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Unirse a Torneo -->
-    <div id="joinTournamentModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center backdrop-blur-sm p-4">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100">
-            <div class="bg-slate-800 p-6 text-white flex justify-between items-center">
-                <h3 class="text-xl font-bold font-heading"><i class="fa-solid fa-link mr-2"></i> Unirse a Torneo</h3>
-                <button onclick="document.getElementById('joinTournamentModal').classList.add('hidden')" class="text-white/80 hover:text-white">
-                    <i class="fa-solid fa-times text-xl"></i>
-                </button>
-            </div>
-            <div class="p-6 space-y-6">
-                <div class="space-y-2">
-                    <label class="text-sm font-medium text-slate-700">Código del Torneo</label>
-                    <input type="text" id="joinTournamentCode" placeholder="Ej: A1B2C3" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-slate-500 outline-none uppercase tracking-widest text-center font-mono text-xl">
-                </div>
-                <div class="space-y-2">
-                    <label class="text-sm font-medium text-slate-700">Tu Nombre</label>
-                    <input type="text" id="joinTournamentName" placeholder="Ej: Ignacio" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-slate-500 outline-none">
-                    <p class="text-xs text-slate-400">Se añadirá a la lista de participantes y quedará sincronizado.</p>
-                </div>
-                <button id="joinTournamentBtn" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl transition-all">
-                    Buscar y Unirse
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Configuración Firebase -->
-    <div id="configModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center backdrop-blur-sm p-4">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all scale-100">
-            <div class="bg-emerald-600 p-6 text-white flex justify-between items-center">
-                <h3 class="text-xl font-bold font-heading"><i class="fa-solid fa-cloud mr-2"></i> Configuración Online</h3>
-                <button onclick="document.getElementById('configModal').classList.add('hidden')" class="text-white/80 hover:text-white">
-                    <i class="fa-solid fa-times text-xl"></i>
-                </button>
-            </div>
-            <div class="p-6 space-y-4">
-                <p class="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                    Para compartir datos entre dispositivos, necesitas configurar un proyecto gratuito de Firebase.
-                    <br><a href="https://console.firebase.google.com/" target="_blank" class="text-blue-600 underline">Crea uno aquí</a> y pega tu configuración abajo.
-                </p>
-                <div class="space-y-2">
-                    <label class="text-sm font-medium text-slate-700">Firebase Config (JSON)</label>
-                    <textarea id="firebaseConfigInput" placeholder='{"apiKey": "...", "authDomain": "...", "projectId": "..."}' class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none h-40 font-mono text-xs"></textarea>
-                </div>
-                <div class="flex gap-3">
-                    <button onclick="saveFirebaseConfig()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all">
-                        Guardar Conexión
-                    </button>
-                    <button onclick="localStorage.removeItem('firebaseConfig'); location.reload();" class="px-4 py-3 text-red-500 hover:bg-red-50 rounded-xl font-medium transition-all">
-                        Desconectar
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Cuenta -->
-    <div id="authModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center backdrop-blur-sm p-4">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100">
-            <div class="bg-slate-900 p-6 text-white flex justify-between items-center">
-                <h3 class="text-xl font-bold font-heading"><i class="fa-solid fa-user mr-2"></i> Cuenta</h3>
-                <button onclick="document.getElementById('authModal').classList.add('hidden')" class="text-white/80 hover:text-white">
-                    <i class="fa-solid fa-times text-xl"></i>
-                </button>
-            </div>
-            <div class="p-6 space-y-4">
-                <div class="space-y-2">
-                    <label class="text-sm font-medium text-slate-700">Nombre</label>
-                    <input type="text" id="authName" placeholder="Tu nombre" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-slate-500 outline-none">
-                </div>
-                <div class="space-y-2">
-                    <label class="text-sm font-medium text-slate-700">Email</label>
-                    <input type="email" id="authEmail" placeholder="email@ejemplo.com" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-slate-500 outline-none">
-                </div>
-                <div class="space-y-2">
-                    <label class="text-sm font-medium text-slate-700">Contraseña</label>
-                    <input type="password" id="authPassword" placeholder="••••••••" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-slate-500 outline-none">
-                </div>
-                <div class="flex gap-3 pt-2">
-                    <button id="btnLogin" class="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl transition-all">Iniciar Sesión</button>
-                    <button id="btnRegister" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 rounded-xl transition-all">Crear Cuenta</button>
-                </div>
-                <div class="pt-2">
-                    <button id="btnLogout" class="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-3 rounded-xl transition-all">Cerrar Sesión</button>
-                </div>
             </div>
         </div>
     </div>
