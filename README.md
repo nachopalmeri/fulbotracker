@@ -1,6 +1,6 @@
-# Football Tracker Pro
+# FulboTracker
 
-A clean, responsive football match tracker for you and your friends. Log matches, share pitch costs, create/join tournaments, and view professional standings — all with optional cloud sync.
+A clean, responsive football match tracker for friends who want to log matches, split pitch costs, create tournaments and view standings — with optional cloud sync.
 
 ## Features
 - Match logging: date, location, goals, result (win/draw/loss)
@@ -75,3 +75,8 @@ service cloud.firestore {
 - Professional UI and UX: clean cards, modals, alerts, and charts.
 - Fully functional without backend setup (local mode); cloud mode available with Firebase.
 - Clear separation of concerns and modular logic suitable for expansion.
+- Built with AI-assisted development and manual review, focused on turning a real-life use case into a working product.
+
+## Status
+
+Portfolio project / functional prototype.
