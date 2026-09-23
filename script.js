@@ -366,13 +366,10 @@ function renderHistory() {
             matches.slice(0, 5).forEach(match => {
                 const row = document.createElement('tr');
                 row.className = 'hover:bg-slate-50 transition-colors';
-                // Remove actions column for dashboard view
-                const fullRow = createRow(match);
-                // Simple hack to remove the last td (actions)
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = fullRow;
-                tempDiv.removeChild(tempDiv.lastElementChild); // Remove action button
-                row.innerHTML = tempDiv.innerHTML;
+                // Same cells as the history table, minus the actions column.
+                // (Parsed inside the <tr>: a <div> would drop the <td> tags.)
+                row.innerHTML = createRow(match);
+                row.lastElementChild.remove();
                 recentMatchesListEl.appendChild(row);
             });
         }
